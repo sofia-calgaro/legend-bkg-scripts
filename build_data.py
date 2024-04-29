@@ -558,7 +558,8 @@ def main():
 
     # analysis runs
     runs=metadb.dataprod.config.analysis_runs
-    runs['p10']=['r000','r001','r002','r003']
+    print("available periods/runs:", runs)
+    runs['p10']=['r004'] 
 
     os.makedirs("outputs",exist_ok=True)
     output_cache = f"outputs/{out_name.replace('.root', '.parquet')}"

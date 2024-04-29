@@ -4,11 +4,14 @@ Main Authors: Sofia Calgaro based on a script from Dashboard Team
 """
 
 import numpy as np
+import uproot
 import math
+import utils
 from bokeh.plotting import figure, show, save
 from bokeh.models import ColorBar, Legend
 from bokeh.palettes import *
 from legendmeta import LegendMetadata
+import matplotlib.pyplot as plt
 from legendmeta.catalog import Props
 import os, json
 import numpy as np
@@ -176,9 +179,9 @@ def plot_detector_map(
         - data_array: list of data to plot (one entry per channel)
         - strings_dict, chdict, chmap: array-related info; 
             can be retrieved with: 
-                'strings_dict, chdict, chmap = sorter(inputs_path, start_key, key="String")
+                strings_dict, chdict, chmap = sorter(inputs_path, start_key, key="String")
             where 
-            1. inputs_path is the global path to the inputs/ folder (eg "/data2/public/prodenv/prod-blind/ref-v1.0.0/inputs") 
+            1. inputs_path is the global path to the inputs/ folder (eg "/data2/public/prodenv/prod-blind/ref-v1.0.0") 
             2. start_key is the starting key of the time interval of interest (usability mask changes over time)
         - title: string to display as a plot title 
         - label: string to display next to the color bar
@@ -241,3 +244,54 @@ def plot_detector_map(
     else:
         plt.show()
     plt.close()
+
+
+
+
+##############################################################################
+## start of the code
+
+period = 'p10'
+spectrum = 'mul_surv'
+dataset = 'all'
+energy_low = 1461 - 5
+energy_high = 1461 + 5
+binning = 1
+runinfo = json.load(open('/data1/users/calgaro/legend-metadata/dataprod/runinfo.json')) # metadb.dataprod.runinfo
+strings_dict, chdict, chmap = sorter('/data2/public/prodenv/prod-blind/tmp-auto', runinfo[period]['r000']['phy']['start_key'], key="String")
+strings_dict_2, chdict, chmap = sorter('/data2/public/prodenv/prod-blind/tmp-auto', runinfo[period]['r001']['phy']['start_key'], key="String")
+strings_dict_3, chdict, chmap = sorter('/data2/public/prodenv/prod-blind/tmp-auto', runinfo[period]['r003']['phy']['start_key'], key="String")
+
+lmeta = LegendMetadata()
+dets_map = lmeta.hardware.detectors.germanium.diodes
+
+path_all = '/data1/users/calgaro/legend-bkg-scripts-dev-sofia/outputs/l200a-p10-013-tmp-auto.root'
+
+
+
+all_names = []
+counts = []
+with uproot.open(path_all) as f:
+    
+    for string in strings_dict.keys():
+        for det_id in strings_dict[string]:
+            det_name = chmap.map("daq.rawid")[det_id]["name"]
+            all_names.append(det_name)
+
+            mass_in_kg = dets_map[det_name]["production"]["mass_in_g"] / 1000
+
+            h1_ch = utils.get_hist(f[f"{spectrum}/ch{det_id}"],(energy_low,energy_high),binning)
+            ct = utils.integrate_hist(h1_ch,energy_low,energy_high)
+            
+            if counts!=0 and chdict[det_name]["usability"] == "on":
+                counts.append(ct/mass_in_kg/livetime)
+            else:
+                counts.append(0)
+
+
+plot_detector_map(all_names, counts, strings_dict, chdict, chmap, label='counts / mass [cts/kg]', title=f"K40 - {period} - events in {energy_low}-{energy_high}", save_name=os.path.join('plots', f"K40_map_p10_013.pdf"))
+
+
+energy_low = 1525 - 5
+energy_high = 1525 + 5
+plot_detector_map(all_names, counts, strings_dict, chdict, chmap, label='counts / mass [cts/kg]', title=f"K42 - {period} - events in {energy_low}-{energy_high}", save_name=os.path.join('plots', f"K42_map_p10_013.pdf"))
