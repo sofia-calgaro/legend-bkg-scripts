@@ -73,7 +73,7 @@ subtract =args.subtract
 plot_hist =bool(args.plot_hist)
 spectrum =args.spectrum
 overlay = args.BAT_overlay
-average= False# args.average
+average= bool(args.average)
 
 include_p10=True
 os.makedirs("outputs_rates",exist_ok=True)
@@ -83,9 +83,26 @@ if (input_p10 is None):
     
 energy=args.energy
 
-energy_low = float(energy.split(",")[0])
-energy_high = float(energy.split(",")[1])
+energy_list=[]
+## just two numbers
+if ("(" not in energy):
+    energy_low = float(energy.split(",")[0])
+    energy_high = float(energy.split(",")[1])
+    energy_list.append((energy_low,energy_high))
+## a list
+else:
+    energy_split=energy.split("(")
+    for e in energy_split:
+        if ("," not in e):
+            continue
+        else:
+            energy = e.split(")")[0]
+            energy_low = float(energy.split(",")[0])
+            energy_high = float(energy.split(",")[1])
+            energy_list.append((energy_low,energy_high))
 
+if (len(energy_list)>1 and subtract):
+    raise ValueError("cant specifiy a split range for the counting analysis ")
 
 ### load the meta-data
 ### ----------------------
@@ -106,8 +123,10 @@ if (include_p10):
 run_times_10=utils.get_run_times(metadb,runs,ac=[1108800, 1080005, 1089600],off=[1080000, 1121603],verbose=True)
 
 ### load the data
-
-out_name =f"{output}_{int(energy_low)}_{int(energy_high)}.root"
+e_str=""
+for (energy_low,energy_high) in energy_list:
+    e_str +=f"{int(energy_low)}_{int(energy_high)}_"
+out_name =f"{output}_{e_str}.root"
 
 hists={}
 hists_p10={}
@@ -260,6 +279,9 @@ if (include_p10):
 total_exposure=0
 total_exposure_p10=0
 
+total_exposure=0
+total_exposure_p10=0
+
 
 for period in periods:
     run_list=runs[period]
@@ -397,8 +419,6 @@ if (average==True):
     if include_p10:
         low_rate_p10 = (counts_total_p10[0]-counts_total_p10[1])/total_exposure_p10
         high_rate_p10 = (counts_total_p10[0]+counts_total_p10[2])/total_exposure_p10
-
-
         axes_full.axhspan(low_rate_p10,high_rate_p10,xmin=(middle)/max_x,xmax=(end_p10+10)/max_x, color=vset.blue, alpha=0.5)
 
 #### overlay BAT fit results

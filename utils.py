@@ -215,7 +215,16 @@ def normalise_histo(hist,factor=1):
         hist[i]*=factor
     return hist
 
-def integrate_hist(hist,low,high):
+def integrate_hist(hist,energies):
+
+    integral = 0
+    for e in energies:
+        integral +=integrate_hist_one_range(hist,e[0],e[1])
+    
+    
+    return integral
+
+def integrate_hist_one_range(hist,low,high):
     """ Integrate the histogram"""
 
     bin_centers= hist.axes.centers[0]
