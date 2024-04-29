@@ -91,7 +91,7 @@ def get_run_times(metadb:LegendMetadata,analysis_runs:dict,verbose:bool=True,ac=
             }
     
     """
-    runinfo = metadb.dataprod.runinfo
+    runinfo = json.load(open('/data1/users/calgaro/runinfo_new.json'))#metadb.dataprod.runinfo
     output={}
     first_time =None
     ### loop over periods
@@ -102,6 +102,8 @@ def get_run_times(metadb:LegendMetadata,analysis_runs:dict,verbose:bool=True,ac=
 
         ## loop over runs
         for run in runinfo[period].keys():
+            removed_ac=0
+            removed_off=0
             
             ## skip 'bad' runs
             if (period in analysis_runs.keys() and run in analysis_runs[period]):
@@ -109,7 +111,7 @@ def get_run_times(metadb:LegendMetadata,analysis_runs:dict,verbose:bool=True,ac=
                 if "phy" in runinfo[period][run].keys() and "livetime_in_s" in runinfo[period][run]["phy"].keys():
                     timestamp = datetime.strptime(runinfo[period][run]["phy"]["start_key"], '%Y%m%dT%H%M%SZ')
                     
-                    ch = metadb.channelmap(metadb.dataprod.runinfo[period][run]["phy"]["start_key"])
+                    ch = metadb.channelmap(runinfo[period][run]["phy"]["start_key"])
 
                     geds_list= [ (_name,_dict["daq"]["rawid"]) for _name, _dict in ch.items() if ch[_name]["system"] == "geds" and 
                                 ch[_name]["analysis"]["usability"] in ["on","no_psd"]]
@@ -126,8 +128,16 @@ def get_run_times(metadb:LegendMetadata,analysis_runs:dict,verbose:bool=True,ac=
                    
                         if (det[1] not in ac) and (det[1] not in off):
                             mass += ch[det[0]].production.mass_in_g/1000
+
+                        if (det[1] in ac):
+                            removed_ac += ch[det[0]].production.mass_in_g/1000
+                        if (det[1] in off):
+                            removed_off += ch[det[0]].production.mass_in_g/1000
                     output[period][run]=[start_time,end_time,mass]
 
+    
+                #print(period, run, "removed_ac:", removed_ac, "kg")
+                #print(period, run, "removed_off:", removed_off, "kg")
     return output
 
 
@@ -170,15 +180,10 @@ def get_error_bar(N:float):
 
     x= np.linspace(0,5+2*N,5000)
     y=poisson.pmf(N,x)
-    histo = ( Hist.new.Reg(5000, 0, 0.5+2*N).Double())
- 
-    for i in range(histo.size-2):
-        histo[i]=y[i]
-
-    return get_smallest_ci(N,x,y)[0],get_smallest_ci(N,x,y)[1],histo
+    return get_smallest_ci(N,x,y)
 
 
-def get_hist(obj,range:tuple=(132,4195),bins:int=10,variable=None,spectrum="mul_surv"):
+def get_hist(obj,range:tuple=(132,4195),bins:int=10,variable=None):
     """                                                                                                                                                                                                    
     Extract the histogram (hist package object) from the uproot histogram                                                                                                                                  
     Parameters:                                                                                                                                                                                            
@@ -189,12 +194,8 @@ def get_hist(obj,range:tuple=(132,4195),bins:int=10,variable=None,spectrum="mul_
         - hist                                                                                                                                                                                             
     """
    
-    if (spectrum=="mul2_surv_e1"):
-        h=obj.to_hist().project(1)[range[0]:range[1]]
-    elif (spectrum=="mul2_surv_e2"):
-        h=obj.to_hist().project(0)[range[0]:range[1]]
-    else:
-        h=obj.to_hist()[range[0]:range[1]]
+        
+    h=obj.to_hist()[range[0]:range[1]]
 
     if (variable is not None):
         h=normalise_histo(variable_rebin(h,variable))
@@ -359,7 +360,9 @@ def sample_hist(hist,N):
 
     edges = hist.axes[0].edges
     int = sum(hist.values())
+
     counts = hist.view()
+
     bin_widths = np.diff(edges)
     probabilities = counts / np.sum(counts )
 
